@@ -15,11 +15,11 @@ jobs:
       
     - name: Verify Actor (User) Triggering the Workflow
       run: |
-        ALLOWED_ACTORS=("your-github-username" "other-authorized-user")
+        ALLOWED_ACTOR="${{ secrets.ALLOWED_USER }}"
         COMMITTER="${{ github.actor }}"
         
-        if [[ ! " ${ALLOWED_ACTORS[@]} " =~ " ${COMMITTER} " ]]; then
-          echo "Access Denied: Unauthorized user ($COMMITTER)."
+        if [[ "$COMMITTER" != "$ALLOWED_ACTOR" ]]; then
+          echo "Access Denied: Unauthorized user ($COMMITTER). Only $ALLOWED_ACTOR is allowed."
           exit 1  # Stop the workflow if user is not authorized
         else
           echo "User $COMMITTER is authorized. Proceeding with deployment."
