@@ -13,23 +13,16 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Get the IP address of the user triggering the workflow
+    - name: Verify Actor (User) Triggering the Workflow
       run: |
-        echo "Fetching the GitHub Actions runner IP..."
-        COMMITTER_IP=$(curl -s http://ipinfo.io/ip)
-        echo "::set-output name=committer_ip::$COMMITTER_IP"
-
-    # Step to compare the committer's IP with the allowed office IP
-    - name: Verify committer IP matches the allowed office IP
-      run: |
-        COMMITTER_IP="${{ steps.get_committer_ip.outputs.committer_ip }}"
-        OFFICE_IP="${{ secrets.OFFICE_IP }}"  # This is the IP you set in GitHub Secrets
+        ALLOWED_ACTORS=("your-github-username" "other-authorized-user")
+        COMMITTER="${{ github.actor }}"
         
-        if [[ "$COMMITTER_IP" != "$OFFICE_IP" ]]; then
-          echo "Access Denied: Unauthorized IP address ($COMMITTER_IP). Only office IP ($OFFICE_IP) is allowed."
-          exit 1  # Stop the workflow if IP doesn't match
+        if [[ ! " ${ALLOWED_ACTORS[@]} " =~ " ${COMMITTER} " ]]; then
+          echo "Access Denied: Unauthorized user ($COMMITTER)."
+          exit 1  # Stop the workflow if user is not authorized
         else
-          echo "Committer IP ($COMMITTER_IP) is allowed. Proceeding with deployment."
+          echo "User $COMMITTER is authorized. Proceeding with deployment."
         fi
 
     - name: Set up Node.js
