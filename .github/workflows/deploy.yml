@@ -1,0 +1,50 @@
+name: Deploy Node.js App
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22.x'  # Specify your Node.js version
+
+    - name: Install dependencies
+      run: |
+        npm install
+
+    - name: Run build (optional for production-ready apps)
+      run: |
+        npm run build  # If you have a build step in your app (e.g., a frontend React app)
+
+    - name: Set up SSH for EC2 Deployment
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.EC2_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H "${{ secrets.EC2_PUBLIC_IP }}" >> ~/.ssh/known_hosts
+
+    - name: Verify SSH connection
+      run: |
+        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} "echo SSH connection successful"
+
+    - name: Deploy to EC2 (Copy files)
+      run: |
+        rsync -avz --delete ./ ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/home/ubuntu/myapp/
+
+    - name: Restart Node.js App
+      run: |
+        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo systemctl restart myapp'
+
+    - name: Restart Nginx
+      run: |
+        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo systemctl restart nginx'
