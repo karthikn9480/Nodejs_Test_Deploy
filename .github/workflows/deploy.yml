@@ -24,7 +24,7 @@ jobs:
 
     - name: Run build (optional for production-ready apps)
       run: |
-        npm run build  # If you have a build step in your app (e.g., a frontend React app)
+        npm run build --if-present # If you have a build step in your app (e.g., a frontend React app)
 
     - name: Set up SSH for EC2 Deployment
       run: |
