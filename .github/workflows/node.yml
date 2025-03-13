@@ -1,0 +1,93 @@
+name: Node.js 
+
+on:
+  push:
+    branches:
+     - dev
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [22.x]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - run: npm install  # Install dependencies
+    - run: npm run build  # Build the app
+
+    # Install sshpass for password-based SSH
+    - name: Install sshpass
+      run: sudo apt-get install sshpass -y
+
+    # Configure AWS CLI with credentials
+    - name: Configure AWS credentials
+      run: |
+        mkdir -p ~/.aws
+        echo "[default]" > ~/.aws/credentials
+        echo "aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
+        echo "aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
+        echo "[default]" > ~/.aws/config
+        echo "region = ${{ secrets.AWS_DEFAULT_REGION }}" >> ~/.aws/config
+
+    # Get the public IP of the runner machine (this is needed for IP Whitelist)
+    - name: Get public IP
+      id: get_ip
+      run: echo "ip=$(curl -s ifconfig.me)" >> $GITHUB_ENV
+
+    # Whitelist the runner's IP in the security group (Include the AWS region)
+    - name: Whitelist inbound rule in security group
+      run: |
+        IP=${{ env.ip }}
+        aws ec2 authorize-security-group-ingress --group-id ${{ secrets.AWS_SECURITY_GROUP_ID }} --protocol tcp --port 22 --cidr ${IP}/32 --region ${{ secrets.AWS_DEFAULT_REGION }}
+
+    - name: Setup SSH for EC2 Deployment
+      run: |
+        mkdir -p ~/.ssh
+        touch ~/.ssh/known_hosts  # Make sure known_hosts file exists
+        chmod 600 ~/.ssh/known_hosts  # Set permissions to allow writing
+        # Add the EC2 host to known_hosts to avoid SSH prompts
+        ssh-keyscan -H "${{ secrets.EC2_PUBLIC_IP }}" >> ~/.ssh/known_hosts
+
+    - name: Verify SSH Connection
+      run: |
+        # Verify if SSH works with the instance first using password
+        echo "Checking SSH connection..."
+        sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} "echo SSH connection successful"
+
+    - name: Ensure /var/www/html/ has correct permissions
+      run: |
+        sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo chown -R ubuntu:ubuntu /var/www/html/'
+        sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo chmod -R 775 /var/www/html/'
+
+    - name: Clear contents of /var/www/html
+      run: |
+        # Use SSH to run commands remotely on EC2
+        sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo rm -rf /var/www/html/*'
+
+    - name: Copy dist folder to /var/www/html
+      run: |
+        # Ensure the build directory is there
+        ls -la ./dist  # Double-check for the build directory
+        # Rsync build files to EC2 instance
+        sshpass -p "${{ secrets.EC2_PASSWORD }}" rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" ./dist/ ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/var/www/html/
+
+    - name: Restart Nginx on EC2
+      run: |
+        # Optionally restart the Nginx service on EC2
+        sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo systemctl restart nginx'
+    # Remove the IP from the whitelist after the deployment
+
+    - name: Remove inbound rule from security group
+      run: |
+        IP=${{ env.ip }}
+        aws ec2 revoke-security-group-ingress --group-id ${{ secrets.AWS_SECURITY_GROUP_ID }} --protocol tcp --port 22 --cidr ${IP}/32 --region ${{ secrets.AWS_DEFAULT_REGION }}
