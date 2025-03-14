@@ -65,18 +65,18 @@ jobs:
 
     - name: Ensure /home/ubuntu/myapp/ has correct permissions
       run: |
-        sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo chown -R ubuntu:ubuntu /home/ubuntu/myapp/'
-        sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo chmod -R 775 /home/ubuntu/myapp/'
+        sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo chown -R ubuntu:ubuntu /opt/nodejs/'
+        sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo chmod -R 775 /opt/nodejs/'
 
-    - name: Clear contents of /home/ubuntu/myapp
+    - name: Clear contents of /opt/nodejs
       run: |
         # Use SSH to run commands remotely on EC2
-        sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo rm -rf /home/ubuntu/myapp/*'
+        sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo rm -rf /opt/nodejs/*'
 
     - name: Copy application files to EC2
       run: |
         # Rsync application files to EC2 instance
-        sshpass -p "${{ secrets.EC2_PASSWORD }}" rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" ./ ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/home/ubuntu/myapp/
+        sshpass -p "${{ secrets.EC2_PASSWORD }}" rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" ./ ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/opt/nodejs/
 
     - name: Restart Node.js App on EC2
       run: |
