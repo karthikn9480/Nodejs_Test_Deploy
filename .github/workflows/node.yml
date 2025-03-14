@@ -80,12 +80,12 @@ jobs:
 
     - name: Restart Node.js App on EC2
       run: |
-        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo systemctl restart myapp'
+        sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo systemctl restart myapp'
 
     - name: Restart Nginx on EC2
       run: |
         # Optionally restart the Nginx service on EC2
-        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo systemctl restart nginx'
+        sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo systemctl restart nginx'
 
     # Remove the IP from the whitelist after the deployment
     - name: Remove inbound rule from security group
