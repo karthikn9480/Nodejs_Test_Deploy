@@ -43,7 +43,7 @@ jobs:
       id: get_ip
       run: echo "ip=$(curl -s ifconfig.me)" >> $GITHUB_ENV
 
-    # Whitelist the runner's IP in the security group (Include  the AWS region)
+    # Whitelist the runner's IP in the security group (Include the AWS region)
     - name: Whitelist inbound rule in security group
       run: |
         IP=${{ env.ip }}
