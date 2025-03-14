@@ -1,4 +1,4 @@
-name: Node.js 
+name: Node.js
 
 on:
   push:
@@ -23,9 +23,8 @@ jobs:
         cache: 'npm'
 
     - run: npm install  # Install dependencies
-    - run: npm run build --if-present  # Build the app
 
-    # Install sshpass for password based SSH
+    # Install sshpass for password-based SSH
     - name: Install sshpass
       run: sudo apt-get install sshpass -y
 
@@ -64,29 +63,31 @@ jobs:
         echo "Checking SSH connection..."
         sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} "echo SSH connection successful"
 
-    - name: Ensure /var/www/html/ has correct permissions
+    - name: Ensure /home/ubuntu/myapp/ has correct permissions
       run: |
-        sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo chown -R ubuntu:ubuntu /var/www/html/'
-        sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo chmod -R 775 /var/www/html/'
+        sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo chown -R ubuntu:ubuntu /home/ubuntu/myapp/'
+        sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo chmod -R 775 /home/ubuntu/myapp/'
 
-    - name: Clear contents of /var/www/html
+    - name: Clear contents of /home/ubuntu/myapp
       run: |
         # Use SSH to run commands remotely on EC2
-        sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo rm -rf /var/www/html/*'
+        sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo rm -rf /home/ubuntu/myapp/*'
 
-    - name: Copy dist folder to /var/www/html
+    - name: Copy application files to EC2
       run: |
-        # Ensure the build directory is there
-        ls -la ./dist  # Double-check for the build directory
-        # Rsync build files to EC2 instance
-        sshpass -p "${{ secrets.EC2_PASSWORD }}" rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" ./dist/ ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/var/www/html/
+        # Rsync application files to EC2 instance
+        sshpass -p "${{ secrets.EC2_PASSWORD }}" rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" ./ ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/home/ubuntu/myapp/
+
+    - name: Restart Node.js App on EC2
+      run: |
+        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo systemctl restart myapp'
 
     - name: Restart Nginx on EC2
       run: |
         # Optionally restart the Nginx service on EC2
-        sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo systemctl restart nginx'
-    # Remove the IP from the whitelist after the deployment
+        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo systemctl restart nginx'
 
+    # Remove the IP from the whitelist after the deployment
     - name: Remove inbound rule from security group
       run: |
         IP=${{ env.ip }}
